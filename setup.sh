@@ -37,13 +37,6 @@ function create_tls_certs() {
   popd || exit 2
 }
 
-mkdir -p ${UEFI_FW_DIR} ${CERTS_DIR}
-
-# create_tls_certs
-#
-# download_uefi_firmware
-# write_firmware_versionfile
-
 function download_flatcar() {
   ./get-flatcar "${FLATCAR_CHANNEL}" current ./lib/assets "$ARCH"
   eval "$(grep FLATCAR_VERSION= lib/assets/flatcar/current/version.txt)"
@@ -58,6 +51,29 @@ function download_k8s_tools() {
     curl -L "https://dl.k8s.io/release/${VERSION}/bin/linux/${ARCH}/${bin}" -o "$DL_DIR/${bin}"
   done
 }
-# download_k8s_tools "$(curl -L -s https://dl.k8s.io/release/stable.txt)"
+
+function download_k8s_release_artifacts() {
+  VERSION=$1
+  DL_DIR="./lib/assets/k8s/$VERSION"
+  mkdir -p "$DL_DIR"
+  DOWNLOAD_DIR="/opt/bin"
+  curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${VERSION}/cmd/kubepkg/templates/latest/deb/kubelet/lib/systemd/system/kubelet.service" | sed "s:/usr/bin:${DOWNLOAD_DIR}:g" > "${DL_DIR}/kubelet.service"
+  curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${VERSION}/cmd/kubepkg/templates/latest/deb/kubeadm/10-kubeadm.conf" | sed "s:/usr/bin:${DOWNLOAD_DIR}:g" > "${DL_DIR}/10-kubeadm.conf"
+}
+
+function get_latest_github_release_tag() {
+  repo=$1
+  curl --silent "https://api.github.com/$repo/release/releases/latest" | jq -r '.tag_name'
+  return $?
+}
+
+# XXX start here
+mkdir -p ${UEFI_FW_DIR} ${CERTS_DIR}
+# create_tls_certs
+# download_uefi_firmware
+# write_firmware_versionfile
+#download_flatcar
+#download_k8s_tools "$(curl -L -s https://dl.k8s.io/release/stable.txt)"
+#download_k8s_release_artifacts "$(get_latest_github_release_tag repos/kubernetes)"
 
 podman run --net=host --rm -v ./lib:/var/lib/matchbox:Z -v ./$CERTS_DIR:/etc/matchbox:Z,ro "$MATCHBOX_IMAGE" -address=0.0.0.0:8080 -rpc-address=0.0.0.0:8081 -log-level=debug
