@@ -19,10 +19,19 @@ UEFI_FW_VERSIONFILE=latest-version
 
 ARCH=arm64
 
-CONTAINER_RUNTIME="$(command -v podman || command -v docker)"
+CONTAINER_RUNTIME="$(command -v podman || command -v ctr || command -v docker)"
 if [[ -z "${CONTAINER_RUNTIME}" ]]; then
-  echo "No container runtime found. Please install Podman or Docker."
+  echo "No container runtime found. Please install Podman containerd or Docker."
   exit 1
+fi
+
+if [[ "$CONTAINER_RUNTIME" == *ctr ]]
+then
+  CONTAINER_RUNTIME_ARGS=" --net-host "
+  ID="matchbox"
+else
+  CONTAINER_RUNTIME_ARGS=" --net=host "
+  ID=""
 fi
 
 function download_uefi_firmware() {
@@ -80,4 +89,10 @@ create_tls_certs
 download_uefi_firmware
 download_flatcar
 
-$CONTAINER_RUNTIME run --net=host --rm -v ./lib:/var/lib/matchbox:Z -v ./$CERTS_DIR:/etc/matchbox:Z,ro "$MATCHBOX_IMAGE" -address=0.0.0.0:8080 -rpc-address=0.0.0.0:8081 -log-level=debug
+sudo $CONTAINER_RUNTIME image pull "$MATCHBOX_IMAGE"
+if [[ "$CONTAINER_RUNTIME" == *ctr ]]
+then
+  sudo $CONTAINER_RUNTIME run $CONTAINER_RUNTIME_ARGS --rm -t --mount type=bind,src="$PWD"/lib,dst=/var/lib/matchbox,options=rbind:rw --mount type=bind,src="$PWD/$CERTS_DIR",dst=/etc/matchbox,options=rbind:ro "$MATCHBOX_IMAGE" matchbox /matchbox -address=0.0.0.0:8080 -rpc-address=0.0.0.0:8081 -log-level=debug
+else
+  sudo $CONTAINER_RUNTIME run $CONTAINER_RUNTIME_ARGS --rm -ti -v ./lib:/var/lib/matchbox:Z -v ./$CERTS_DIR:/etc/matchbox:Z,ro "$MATCHBOX_IMAGE" -address=0.0.0.0:8080 -rpc-address=0.0.0.0:8081 -log-level=debug
+fi
