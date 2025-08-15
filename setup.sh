@@ -62,9 +62,7 @@ function create_tls_certs() {
 
 function download_flatcar() {
   # check current release version
-  curl -LO "https://${FLATCAR_CHANNEL}.release.flatcar-linux.net/${ARCH}-usr/current/version.txt"
-  eval "$(grep FLATCAR_VERSION= version.txt)"
-  rm version.txt
+  eval "$(curl -s "https://${FLATCAR_CHANNEL}.release.flatcar-linux.net/${ARCH}-usr/current/version.txt" | grep FLATCAR_VERSION=)"
   if [[ -z "${FLATCAR_VERSION}" ]]; then
     echo "Failed to determine Flatcar version from version.txt."
     exit 1
